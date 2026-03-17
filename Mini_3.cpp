@@ -13,10 +13,14 @@ private:
 	int weight{};
 
 public:
+
+	virtual void displayItemInfo() = 0;
 	Item(string name, int weight) 
 		: name(name), weight(weight) {}
-
+	string getName() { return name; }
+	int getWeight() { return weight; }
 };
+
 //============ WEAPON CLASS
 class Weapon : public Item {
 private:
@@ -24,7 +28,9 @@ private:
 public:
 	Weapon(string name, int weight, int damage) 
 		: Item(name, weight), damage(damage){}
-
+	void displayItemInfo() override {
+		cout << "[" << getName() << "]" << " - (weight): " << getWeight() << " (damage): " << damage;
+	}
 };
 
 //============ ARMOR CLASS
@@ -35,6 +41,9 @@ public:
 	Armor(string name, int weight, int defense)
 		: Item(name, weight), defense(defense) {}
 
+	void displayItemInfo() override {
+		cout << "[" << getName() << "]" << " - (weight): " << getWeight() << " (defense): " << defense;
+	}
 };
 
 
@@ -45,7 +54,10 @@ private:
 public:
 	Consumable(string name, int weight, int value)
 		: Item(name, weight), value(value) {}
-	
+
+	void displayItemInfo() override {
+		cout << "[" << getName() << "]" << " - (weight): " << getWeight() << " (healing): " << value;
+	}
 };
 
 /*An Inventory class that holds a collection of items with a max weight capacity. Supports adding, removing, and listing items. If adding an item would exceed the weight limit, reject it.*/
@@ -56,23 +68,20 @@ class Inventory {
 private:
 	Player* owner{nullptr};
 	vector<unique_ptr<Item>> storage{};
-	int max_weight{};
+	int currentWeight{0};
+	int maxWeight{};
 
 public:
 
 	Player& getOwner() { return *owner; }
 
 	Inventory() = default;
-	Inventory(Player* owner = nullptr, int max_weight = 10) 
-		: owner(owner), max_weight(max_weight) {}
-	
-	void addItem(unique_ptr<Item>& item) {
-	
-	}
+	Inventory(Player* owner = nullptr, int maxWeight = 30) 
+		: owner(owner), maxWeight(maxWeight) {}
 
-	
-
-
+	void indexInventory();
+	void addItem(unique_ptr<Item>);
+	void removeItem(string itemName);
 };
 
 class Player {
@@ -84,7 +93,7 @@ public:
 	Player(string name = "default_player", int health = 100)
 		: name(name), health(health) 
 	{
-		playerInventory = make_unique<Inventory>(this, 15);
+		playerInventory = make_unique<Inventory>(this, 50);
 	}
 	Inventory* getPlayerInventory() { return playerInventory.get(); }
 	string getName() { return name; }
@@ -92,13 +101,36 @@ public:
 	void setHealth(int h) { health = h; }
 
 
-	void addItem(unique_ptr<Item>& item) {
-		playerInventory->addItem(item);
+	void addItem(unique_ptr<Item> item) {
+		playerInventory->addItem(move(item));
 	}
-
-	
-
 };
+
+//=========== EXTERNAL INVENTORY FUNCTIONS (REQUIRE PLAYER) =========== 
+
+void Inventory::indexInventory() {
+	if (storage.empty()) { return; }
+	for (size_t i{0}; i < storage.size(); i++) {
+		cout << "[" << i+1 << "]" << " = "; storage.at(i)->displayItemInfo(); cout << "\n";
+	}
+}
+
+//add function
+void Inventory::addItem(unique_ptr<Item> item) {
+	if (currentWeight + item->getWeight() <= maxWeight) {
+		cout << owner->getName() << " recieved : " << item->getName() << "\n";
+		currentWeight += item->getWeight();
+		storage.push_back(move(item)); // add item
+	}
+	else {
+		cout << "item " << item->getName() << " is to heavy to pick up.\n";
+	}
+}
+//remove function
+void Inventory::removeItem(string itemName) {
+	// display inventory
+}
+//======================================================================
 
 class World {
 private:
@@ -124,19 +156,18 @@ public:
 				return p.get();
 			}
 			else {
-				nullptr;
+				return nullptr;
 			}
 		}
 	}
 
 	void worldMain() {
 		createPlayer("slipshod", 100);
-		//displayPlayers();
 		Player* slipshod = getPlayer("slipshod");
-		cout << slipshod->getName();
-		slipshod->setHealth(5);
-		displayPlayers();
-	}
+		slipshod->addItem(make_unique<Weapon>("Sword", 12, 4));
+		slipshod->addItem(make_unique<Armor>("Helmet", 20, 5));
+		slipshod->getPlayerInventory()->indexInventory();
+	} 
 };
 
 int main() {
