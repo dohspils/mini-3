@@ -2,7 +2,9 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <nlohmann/json.hpp>
 
+using json = nlohmann::json;
 using namespace std;
 
 //weapon armor consumable
@@ -72,16 +74,17 @@ private:
 	int maxWeight{};
 
 public:
-
+	vector<unique_ptr<Item>>& getStorage() { return storage; }
 	Player& getOwner() { return *owner; }
 
 	Inventory() = default;
 	Inventory(Player* owner = nullptr, int maxWeight = 30) 
 		: owner(owner), maxWeight(maxWeight) {}
 
+	//== Function definitions are below player ==
 	void indexInventory();
 	void addItem(unique_ptr<Item>);
-	void removeItem(string itemName);
+	void removeItem(int i);
 };
 
 class Player {
@@ -93,7 +96,7 @@ public:
 	Player(string name = "default_player", int health = 100)
 		: name(name), health(health) 
 	{
-		playerInventory = make_unique<Inventory>(this, 50);
+		playerInventory = make_unique<Inventory>(this, 100);
 	}
 	Inventory* getPlayerInventory() { return playerInventory.get(); }
 	string getName() { return name; }
@@ -103,6 +106,58 @@ public:
 
 	void addItem(unique_ptr<Item> item) {
 		playerInventory->addItem(move(item));
+	}
+	void removeItemMenu() {
+		if (playerInventory->getStorage().empty()) { cout << "[!] inventory is empty [!]\n";  return; }
+		playerInventory->indexInventory();
+		int response{};
+		cout << "Type the number correlated to the item to remove.\n";
+		while (!(cin >> response)) {
+			cin.clear();
+			cin.ignore(100, '\n');
+			cout << "invalid, try again.\n";
+		}
+		playerInventory->removeItem(response - 1);
+	}
+
+
+	void mainMenu() {
+		
+
+		char response{};
+		do {
+			cout << "\n\n============ MAIN MENU ============\n\n";
+			cout << "(1) - give weapon\n";
+			cout << "(2) - give armor\n";
+			cout << "(3) - give consumable\n";
+			cout << "___________________________________\n";
+			cout << "(r) - remove item\n";
+			cout << "(s) - save & quit\n";
+			cout << "===================================\n";
+
+
+			cin >> response;
+			switch (response) {
+			case '1':
+				addItem(make_unique<Weapon>("Sword", 45, 20));
+				break;
+			case '2':
+				addItem(make_unique<Armor>("Helmet", 45, 7));
+				break;
+			case '3':
+				addItem(make_unique<Consumable>("Potion", 5, 20));
+				break;
+			case 'r':
+				removeItemMenu();
+				break;
+			case 's':
+				break;
+			default:
+				cout << "invalid, try again: ";
+				break;
+			}
+		} while (response != 'S' && response != 's');
+		cout << "SAVEEE!!!!!\n";
 	}
 };
 
@@ -127,46 +182,76 @@ void Inventory::addItem(unique_ptr<Item> item) {
 	}
 }
 //remove function
-void Inventory::removeItem(string itemName) {
-	// display inventory
+void Inventory::removeItem(int i) {
+	if (storage.empty()) { cout << "inventory is empty.\n"; return; }
+	if (storage.at(i)) {
+		string nameOfItem = storage.at(i)->getName();
+		currentWeight -= storage.at(i)->getWeight();
+		storage.erase(storage.begin() + i);
+		cout << "item \"" << nameOfItem << "\" has been removed.\n";
+	}
 }
 //======================================================================
 
 class World {
 private:
-	vector<unique_ptr<Player>> Players{};
+	unique_ptr<Player> currentPlayer{};
 
 public:
 	World() = default;
 	
 	void createPlayer(string name, int health) {
 		unique_ptr<Player> newPlayer = make_unique<Player>(name, health);
-		Players.push_back(move(newPlayer));
+		currentPlayer = (move(newPlayer));
 	}
 
-	void displayPlayers() {
-		for (auto& p : Players) {
-			cout << p->getHealth();
+	void playerCreate(){
+		string inputName{};
+		cout << "Enter name: ";
+		cin >> inputName;
+		int inputHealth{};
+		cout << "Enter health: ";
+		
+		while (!(cin >> inputHealth)) {
+			cin.clear();
+			cin.ignore(100, '\n');
+			cout << "Enter a valid number for health: ";
 		}
+		createPlayer(inputName, inputHealth);
 	}
 
-	Player* getPlayer(string name) {
-		for (auto& p : Players) {
-			if (p->getName() == name) {
-				return p.get();
+	void loadPlayer() {
+	
+	}
+
+	void startScreen() {
+		char response{};
+		cout << "---===[ Mini Project 3 ]===---\n";
+		while (true) {
+			cout << "(1) - create player\n";
+			cout << "(2) - load player\n";
+			cout << ": ";
+			cin >> response;
+			cout << "\n";
+
+			switch (response) {
+			case '1':
+				playerCreate();
+				break;
+			case '2':
+				loadPlayer();
+				break;
+			default:
+				cout << "please enter a valid option\n";
+				continue;
 			}
-			else {
-				return nullptr;
-			}
+			break;
 		}
 	}
 
 	void worldMain() {
-		createPlayer("slipshod", 100);
-		Player* slipshod = getPlayer("slipshod");
-		slipshod->addItem(make_unique<Weapon>("Sword", 12, 4));
-		slipshod->addItem(make_unique<Armor>("Helmet", 20, 5));
-		slipshod->getPlayerInventory()->indexInventory();
+		startScreen();
+		currentPlayer->mainMenu();
 	} 
 };
 
