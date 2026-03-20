@@ -2,25 +2,38 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <fstream>
+#include <filesystem>
+#include <optional>
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
+
 using namespace std;
 
 //weapon armor consumable
 //============ ITEM CLASS
+enum class ItemType {
+	WEAPON,
+	ARMOR,
+	CONSUMABLE
+};
+
 class Item {
 private:
 	string name{};
 	int weight{};
+	ItemType type{};
 
 public:
 
 	virtual void displayItemInfo() = 0;
-	Item(string name, int weight) 
+	virtual int getValue() = 0;
+	Item(string name, int weight, ItemType type) 
 		: name(name), weight(weight) {}
 	string getName() { return name; }
 	int getWeight() { return weight; }
+	ItemType getType() { return type; }
 };
 
 //============ WEAPON CLASS
@@ -29,9 +42,13 @@ private:
 	int damage{};
 public:
 	Weapon(string name, int weight, int damage) 
-		: Item(name, weight), damage(damage){}
+		: Item(name, weight, ItemType::WEAPON), damage(damage){}
 	void displayItemInfo() override {
 		cout << "[" << getName() << "]" << " - (weight): " << getWeight() << " (damage): " << damage;
+	}
+
+	int getValue() override {
+		return damage;
 	}
 };
 
@@ -41,11 +58,15 @@ private:
 	int defense{};
 public:
 	Armor(string name, int weight, int defense)
-		: Item(name, weight), defense(defense) {}
+		: Item(name, weight, ItemType::ARMOR), defense(defense) {}
 
 	void displayItemInfo() override {
 		cout << "[" << getName() << "]" << " - (weight): " << getWeight() << " (defense): " << defense;
 	}
+	int getValue() override {
+		return defense;
+	}
+
 };
 
 
@@ -55,10 +76,14 @@ private:
 	int value{};
 public:
 	Consumable(string name, int weight, int value)
-		: Item(name, weight), value(value) {}
+		: Item(name, weight, ItemType::CONSUMABLE), value(value) {}
 
 	void displayItemInfo() override {
 		cout << "[" << getName() << "]" << " - (weight): " << getWeight() << " (healing): " << value;
+	}
+
+	int getValue() override {
+		return value;
 	}
 };
 
@@ -119,7 +144,73 @@ public:
 		}
 		playerInventory->removeItem(response - 1);
 	}
+	// TYPE TO STRING / STRING TO TYPE
+	string typeToString(ItemType itemType) {
+		switch (itemType) {
+		case ItemType::WEAPON:
+			return "weapon";
+		case ItemType::ARMOR:
+			return "armor";
+		case ItemType::CONSUMABLE:
+			return "consumable";
+		default:
+			break;
+		}
+	}
 
+	static ItemType stringToType(string itemType) {
+		if (itemType == "weapon") { return ItemType::WEAPON; }
+		if (itemType == "armor") { return ItemType::ARMOR; }
+		if (itemType == "consumable") { return ItemType::CONSUMABLE; }
+	}
+
+	void savePlayer(const string& fileName) {
+		json data;
+
+		data["playerName"] = name;
+		data["health"] = health;
+
+
+		data["inventory"] = json::array();
+
+		for (auto& i : playerInventory->getStorage()) {
+			data["inventory"].push_back({{"name", i->getName()},
+				{"weight", i->getWeight()}, {"value", i->getValue()}, {"type", typeToString(i->getType())} });
+		}
+		 
+		ofstream file(fileName);
+		file << data.dump(4);
+	}
+	
+	static optional<unique_ptr<Player>> loadPlayer(const string& fileName) {
+		if (filesystem::exists(fileName)) {
+			ifstream file(fileName);
+			json data = json::parse(file);
+
+			unique_ptr<Player> loadedPlayer = make_unique<Player>(data["playerName"], data["health"]);
+
+			for (auto item : data["inventory"]) {
+				ItemType itemEnum = stringToType(item["type"]);
+
+				switch (itemEnum) {
+				case ItemType::WEAPON:
+					loadedPlayer->addItem(move(make_unique<Weapon>(item["name"], item["weight"], item["value"])));
+					break;
+				case ItemType::ARMOR:
+					loadedPlayer->addItem(move(make_unique<Armor>(item["name"], item["weight"], item["value"])));
+					break;
+				case ItemType::CONSUMABLE:
+					loadedPlayer->addItem(move(make_unique<Consumable>(item["name"], item["weight"], item["value"])));
+					break;
+				default:
+					break;
+				}
+			}	
+			return move(loadedPlayer);
+		}
+		else { return nullopt; }
+		
+	}
 
 	void mainMenu() {
 		
@@ -151,6 +242,7 @@ public:
 				removeItemMenu();
 				break;
 			case 's':
+				savePlayer(name + ".json");
 				break;
 			default:
 				cout << "invalid, try again: ";
@@ -191,6 +283,7 @@ void Inventory::removeItem(int i) {
 		cout << "item \"" << nameOfItem << "\" has been removed.\n";
 	}
 }
+
 //======================================================================
 
 class World {
@@ -220,9 +313,22 @@ public:
 		createPlayer(inputName, inputHealth);
 	}
 
-	void loadPlayer() {
-	
+	void loadPlayerScreen() {
+		string inputName{};
+		cout << "Enter the name of the player you want to load: ";
+		cin >> inputName;
+		cout << "\n";
+
+		auto loadedPlayer = Player::loadPlayer(inputName + ".json");
+		if (loadedPlayer.has_value()) {
+			currentPlayer = move(loadedPlayer.value());
+		}
+		else {
+			cout << "That player does not exist.\n";
+		}
 	}
+
+	
 
 	void startScreen() {
 		char response{};
@@ -239,7 +345,7 @@ public:
 				playerCreate();
 				break;
 			case '2':
-				loadPlayer();
+				loadPlayerScreen();
 				break;
 			default:
 				cout << "please enter a valid option\n";
@@ -261,38 +367,3 @@ int main() {
 	
 	return 0;
 }
-
-/*What to Build
-1. Item System
-A base Item class with derived types — at minimum Weapon, Armor, and Consumable. Each item has a name, weight, and value. Derived types add their own relevant stats (damage, defense, heal amount, etc.).
-2. Inventory
-An Inventory class that holds a collection of items with a max weight capacity. Supports adding, removing, and listing items. If adding an item would exceed the weight limit, reject it.
-3. World Class
-This is where you apply what we just talked about. A World class owns the player, the inventory, and anything else that exists. Main just creates World and calls run.
-4. Save System
-Serialize the inventory to a .txt file. Each item gets written as a line of data. Keep the format simple and human-readable:
-Weapon,Sword,3.5,150,25
-Armor,ChestPlate,8.0,200,15
-Consumable,HealthPotion,0.5,50,30
-5. Load System
-Read the file back in, parse each line, reconstruct the correct derived item type, and repopulate the inventory.
-
-Turn Loop
-1. Print inventory contents and current weight
-2. Player chooses action (add item, remove item, save, load, quit)
-3. Execute action
-4. Repeat
-
-Constraints
-
-World class owns everything
-All heap objects use unique_ptr
-Save file is plain .txt, human readable
-No combat needed — pure inventory management
-
-
-You've Nailed It If
-
-Saving then closing the program then loading brings back the exact same inventory
-Adding an item over the weight limit is rejected cleanly
-Adding a new item type means writing one new class and updating the save/load parser, nothing else*/
