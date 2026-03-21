@@ -1,0 +1,12 @@
+{
+    "health": 999,
+    "inventory": [
+        {
+            "name": "Sword",
+            "type": "weapon",
+            "value": 20,
+            "weight": 45
+        }
+    ],
+    "playerName": "lildishwasher"
+}

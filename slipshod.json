@@ -1,5 +1,24 @@
 {
     "health": 99,
-    "inventory": [],
+    "inventory": [
+        {
+            "name": "Helmet",
+            "type": "armor",
+            "value": 7,
+            "weight": 45
+        },
+        {
+            "name": "Sword",
+            "type": "weapon",
+            "value": 20,
+            "weight": 45
+        },
+        {
+            "name": "Potion",
+            "type": "consumable",
+            "value": 20,
+            "weight": 5
+        }
+    ],
     "playerName": "slipshod"
 }

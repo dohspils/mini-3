@@ -30,7 +30,7 @@ public:
 	virtual void displayItemInfo() = 0;
 	virtual int getValue() = 0;
 	Item(string name, int weight, ItemType type) 
-		: name(name), weight(weight) {}
+		: name(name), weight(weight), type(type) {}
 	string getName() { return name; }
 	int getWeight() { return weight; }
 	ItemType getType() { return type; }
@@ -298,10 +298,14 @@ public:
 		currentPlayer = (move(newPlayer));
 	}
 
-	void playerCreate(){
+	bool playerCreate(){
 		string inputName{};
 		cout << "Enter name: ";
 		cin >> inputName;
+		if (filesystem::exists(inputName + ".json")) {
+			cout << "A player under than name is already created. Try loading!\n";
+			return false;
+		}
 		int inputHealth{};
 		cout << "Enter health: ";
 		
@@ -311,9 +315,10 @@ public:
 			cout << "Enter a valid number for health: ";
 		}
 		createPlayer(inputName, inputHealth);
+		return true;
 	}
 
-	void loadPlayerScreen() {
+	bool loadPlayerScreen() {
 		string inputName{};
 		cout << "Enter the name of the player you want to load: ";
 		cin >> inputName;
@@ -322,9 +327,11 @@ public:
 		auto loadedPlayer = Player::loadPlayer(inputName + ".json");
 		if (loadedPlayer.has_value()) {
 			currentPlayer = move(loadedPlayer.value());
+			return true;
 		}
 		else {
 			cout << "That player does not exist.\n";
+			return false;
 		}
 	}
 
@@ -342,10 +349,17 @@ public:
 
 			switch (response) {
 			case '1':
-				playerCreate();
+				if (!playerCreate()) {
+					continue;
+				}
 				break;
 			case '2':
-				loadPlayerScreen();
+				if (loadPlayerScreen()) {
+					cout << "Player Found!\n";
+				}
+				else {
+					continue;
+				}
 				break;
 			default:
 				cout << "please enter a valid option\n";
@@ -354,7 +368,7 @@ public:
 			break;
 		}
 	}
-
+	 
 	void worldMain() {
 		startScreen();
 		currentPlayer->mainMenu();
